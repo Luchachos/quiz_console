@@ -1,92 +1,88 @@
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
-// Фейковый UI для тестов
-class FakeUserInterface implements UserInterface {
-    private final StringBuilder outputLog = new StringBuilder();
-    private final List<String> inputs;
-    private int inputIndex = 0;
+class BotTest {
+    private FakeUserInterface ui;
+    private QuizBot bot;
 
-    public FakeUserInterface(List<String> inputs) {
-        this.inputs = inputs;
-    }
-
-    @Override
-    public void sendMessage(String message) {
-        outputLog.append(message).append("\n");
-    }
-
-    @Override
-    public String askQuestion(String questionText) {
-        outputLog.append(questionText).append("\n"); // Логируем вопрос
-        if (inputIndex < inputs.size()) {
-            return inputs.get(inputIndex++);
-        }
-        return ""; // Конец ввода
-    }
-
-    public String getOutput() {
-        return outputLog.toString();
-    }
-}
-
-// Тесты
-class QuizBotTest {
-
-    @Test
-    void testCorrectAnswerFlow() {
-        // Сценарий: Пользователь отвечает правильно на первый вопрос
-        // (Предполагаем, что в тестовом провайдере только 1 вопрос для простоты)
-        QuestionProvider mockProvider = () -> List.of(
-                new Question("Test Q?", List.of("A", "B"), 1) // Правильный "B" (индекс 1)
-        );
-
-        // Ввод пользователя: "2" (что соответствует индексу 1)
-        FakeUserInterface fakeUi = new FakeUserInterface(List.of("2"));
-        QuizBot bot = new QuizBot(mockProvider, fakeUi);
-
-        bot.start();
-
-        String output = fakeUi.getOutput();
-        assertTrue(output.contains("Верно!"), "Бот должен подтвердить правильный ответ");
-        assertTrue(output.contains("Викторина завершена!"), "Бот должен завершить работу");
+    @BeforeEach
+    void setUp() {
+        ui = new FakeUserInterface();
+        bot = new QuizBot(new FakeProvider(), ui);
     }
 
     @Test
-    void testHelpCommand() {
-        QuestionProvider mockProvider = () -> List.of(
-                new Question("Test Q?", List.of("A", "B"), 0)
-        );
-
-        // Ввод: "help", затем правильный ответ "1"
-        FakeUserInterface fakeUi = new FakeUserInterface(List.of("help", "1"));
-        QuizBot bot = new QuizBot(mockProvider, fakeUi);
-
+    void start_показывает_темы() {
         bot.start();
-
-        String output = fakeUi.getOutput();
-        // Проверяем, что бот вывел справку (начальное сообщение) повторно
-        long helpCount = output.lines().filter(line -> line.contains("Я бот-викторина")).count();
-        assertEquals(2, helpCount, "Справка должна быть выведена дважды (старт + help)");
-        assertTrue(output.contains("Верно!"));
+        assertTrue(ui.lastContains("Доступные темы"));
     }
 
     @Test
-    void testInvalidInputThenCorrect() {
-        QuestionProvider mockProvider = () -> List.of(
-                new Question("Test Q?", List.of("A", "B"), 0)
-        );
-
-        // Ввод: текст (ошибка), число вне диапазона (ошибка), правильный ответ "1"
-        FakeUserInterface fakeUi = new FakeUserInterface(List.of("abc", "99", "1"));
-        QuizBot bot = new QuizBot(mockProvider, fakeUi);
-
+    void выбор_темы_показывает_вопрос() {
         bot.start();
+        bot.handleInput("1"); // выбираем Java
+        assertTrue(ui.lastContains("Вопрос 1"));
+    }
 
-        String output = fakeUi.getOutput();
-        assertTrue(output.contains("Ошибка: введите число"), "Должна быть ошибка формата");
-        assertTrue(output.contains("Пожалуйста, введите число от 1 до 2"), "Должна быть ошибка диапазона");
-        assertTrue(output.contains("Верно!"));
+    @Test
+    void правильный_ответ_идет_дальше() {
+        bot.start();
+        bot.handleInput("1"); // тема Java
+        bot.handleInput("1"); // правильный ответ на Вопрос 1
+        assertTrue(ui.lastContains("Верно"));
+        assertTrue(ui.lastContains("Вопрос 2"));
+    }
+
+    @Test
+    void неправильный_ответ_оставляет_на_том_же_вопросе() {
+        bot.start();
+        bot.handleInput("1"); // тема Java
+        bot.handleInput("2"); // неправильный (B)
+        assertTrue(ui.lastContains("Неверно"));
+    }
+
+    @Test
+    void неверный_ввод_выдает_ошибку() {
+        bot.start();
+        bot.handleInput("1"); // тема Java
+        bot.handleInput("абракадабра");
+        assertTrue(ui.lastContains("Ошибка"));
+    }
+
+    @Test
+    void help_показывает_справку() {
+        bot.start();
+        bot.handleInput("1"); // тема Java
+        bot.handleInput("help");
+        assertTrue(ui.lastContains("Я бот-викторина"));
+    }
+
+    @Test
+    void прохождение_темы_и_выход() {
+        bot.start();
+        bot.handleInput("1"); // тема
+        bot.handleInput("1"); // ответ 1
+        bot.handleInput("2"); // ответ 2 (последний)
+        assertTrue(ui.lastContains("пройдена")); // тема пройдена
+
+        bot.handleInput("нет"); // не хотим продолжать
+        assertTrue(ui.lastContains("Спасибо за игру"));
+    }
+
+    @Test
+    void прохождение_темы_и_повтор() {
+        bot.start();
+        bot.handleInput("1"); // тема
+        bot.handleInput("1"); // ответ 1
+        bot.handleInput("2"); // ответ 2
+        bot.handleInput("да"); // хотим продолжать
+        assertTrue(ui.lastContains("Доступные темы"));
+    }
+
+    @Test
+    void до_старта_бот_просит_start() {
+        bot.handleInput("привет");
+        assertTrue(ui.lastContains("/start"));
     }
 }

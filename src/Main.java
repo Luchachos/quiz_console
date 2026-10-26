@@ -1,33 +1,27 @@
-import java.util.Scanner;
+import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.TelegramBotsApi;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
-// Реализация UI для консоли
-class ConsoleUserInterface implements UserInterface {
-    private final Scanner scanner = new Scanner(System.in);
-
-    @Override
-    public void sendMessage(String message) {
-        System.out.println(message);
-    }
-
-    @Override
-    public String askQuestion(String questionText) {
-        System.out.print(questionText);
-        return scanner.nextLine();
-    }
-}
 
 public class Main {
+    // ЗАМЕНИТЕ на свои значения!
+    private static final String BOT_USERNAME = "IaTvoyuMamuEbalBot";
+    private static final String BOT_TOKEN = "8999320762:AAF6Q2kbIHnMWeYGWTadQZasdrw_l3S92to";
+
     public static void main(String[] args) {
-        // 1. Создаем зависимость для данных
-        QuestionProvider provider = new HardcodedQuestionProvider();
+        try {
+            TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
 
-        // 2. Создаем зависимость для UI
-        UserInterface ui = new ConsoleUserInterface();
+            QuestionProvider provider = new HardcodedQuestionProvider();
+            QuizTelegramBot bot = new QuizTelegramBot(provider, BOT_USERNAME, BOT_TOKEN);
 
-        // 3. Внедряем зависимости в бота
-        QuizBot bot = new QuizBot(provider, ui);
-
-        // 4. Запускаем
-        bot.start();
+            botsApi.registerBot(bot);
+            System.out.println("Бот запущен!");
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
     }
 }

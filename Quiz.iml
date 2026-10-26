@@ -23,5 +23,7 @@
       </library>
     </orderEntry>
     <orderEntry type="library" name="Maven: org.junit.jupiter:junit-jupiter-api:5.10.0" level="project" />
+    <orderEntry type="library" name="Maven: org.telegram:telegrambots:6.9.7.1" level="project" />
+    <orderEntry type="library" name="Maven: org.telegram:telegrambots-meta:6.9.7.1" level="project" />
   </component>
 </module>
