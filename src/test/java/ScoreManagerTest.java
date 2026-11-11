@@ -27,6 +27,7 @@ class ScoreManagerTest {
         if (f.exists()) f.delete();
     }
 
+
     @Test
     void updateRecord_savesNewPlayer() {
         ScoreManager sm = new ScoreManager();

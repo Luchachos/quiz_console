@@ -16,12 +16,6 @@ public class FakeUserInterface implements UserInterface {
     }
 
     @Override
-    public String askQuestion(String questionText) {
-        sendMessage(questionText);
-        return nextQuestionAnswer;
-    }
-
-    @Override
     public String getUsername() {
         return username;
     }

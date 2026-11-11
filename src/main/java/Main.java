@@ -3,6 +3,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 import java.util.Scanner;
 
+
 public class Main {
     public static void main(String[] args) {
         QuestionProvider provider = new HardcodedQuestionProvider();
@@ -43,29 +44,21 @@ public class Main {
 
 
     private static void runConsoleGame(QuestionProvider provider, ScoreManager scoreManager) {
-
         String playerName = "Консольный_Игрок";
 
-        // 2. Создаем интерфейс и бота
+        // 1. Создаем UI
         ConsoleUserInterface consoleUi = new ConsoleUserInterface(playerName);
+
+        // 2. Создаем Бота
         QuizBot bot = new QuizBot(provider, scoreManager, consoleUi);
 
         System.out.println("Добро пожаловать в консольную викторину!");
 
-        // 3. Запускаем игру
+        // 3. Запускаем игру (отправляет приветствие и первый вопрос)
         bot.start();
 
-        // 4. Бесконечный цикл ввода (вместо askQuestion)
-        while (true) {
-            Scanner scanner = new Scanner(System.in);
-            String input = scanner.nextLine();
-            if (input.equalsIgnoreCase("exit") || input.equalsIgnoreCase("выход")) {
-                System.out.println("Выход из игры. До встречи!");
-                break;
-            }
-            // Передаем текст в QuizBot (он сам разберется, ответ это или 'рейтинг')
-            bot.handleInput(input);
-        }
+        // 4. Отдаем управление консоли: теперь UI сам читает ввод и передает его боту
+        consoleUi.startListening(bot);
     }
 
     private static void runTelegramBot(QuestionProvider provider, ScoreManager scoreManager) {

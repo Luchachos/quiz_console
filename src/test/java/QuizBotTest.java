@@ -22,8 +22,8 @@ class QuizBotTest {
         java.io.File f = new java.io.File("records.txt");
         if (f.exists()) f.delete();
 
-        q1 = new Question("Язык?", List.of("Python", "Java", "C++"), 1);
-        q2 = new Question("Река?", List.of("Амазонка", "Нил", "Янцзы"), 0);
+        q1 = new Question("Язык?", List.of("Python", "Java", "C++"), "Java");
+        q2 = new Question("Река?", List.of("Амазонка", "Нил", "Янцзы"), "Амазонка");
 
         ui = new FakeUserInterface("tester");
         scoreManager = new ScoreManager();

@@ -26,11 +26,6 @@ public class TelegramLibraryUserInterface implements UserInterface {
         }
     }
 
-    @Override
-    public String askQuestion(String questionText) {
-        sendMessage(questionText);
-        return null; // Ответ придет асинхронно, как и раньше
-    }
 
     @Override
     public String getUsername() {

@@ -16,7 +16,7 @@ public class QuizTelegramLibraryBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-        return "TELEGRAM_TOKEN"; // Берем из переменной окружения
+        return "9013916472:AAHKe2wjz4NTBrMjhLFz-cMoTvXdZJYOu8k"; // Берем из переменной окружения
     }
 
     @Override
@@ -28,17 +28,12 @@ public class QuizTelegramLibraryBot extends TelegramLongPollingBot {
         String username = update.getMessage().getFrom().getUserName();
         if (username == null) username = update.getMessage().getFrom().getFirstName();
 
-        // Создаем наш интерфейс для этого сообщения
+        // Создаем интерфейс для этого сообщения
         TelegramLibraryUserInterface ui = new TelegramLibraryUserInterface(chatId, this, username);
 
         // Получаем или создаем сессию
         QuizBot bot = sessionManager.getOrCreate(chatId, ui);
 
-        // Маршрутизация
-        if (text.equalsIgnoreCase("/start")) {
-            bot.start();
-        } else {
-            bot.handleInput(text);
-        }
+        bot.handleInput(text);
     }
 }

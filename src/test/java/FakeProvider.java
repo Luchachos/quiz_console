@@ -7,6 +7,7 @@ public class FakeProvider implements QuestionProvider {
         this.questions = questions;
     }
 
+
     @Override
     public List<Question> getQuestions() {
         return questions;
