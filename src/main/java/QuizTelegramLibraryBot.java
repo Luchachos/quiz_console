@@ -16,7 +16,8 @@ public class QuizTelegramLibraryBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-        return "9013916472:AAHKe2wjz4NTBrMjhLFz-cMoTvXdZJYOu8k"; // Берем из переменной окружения
+        String token = System.getenv("BOT_TOKEN");
+        return token;// Берем из переменной окружения
     }
 
     @Override
