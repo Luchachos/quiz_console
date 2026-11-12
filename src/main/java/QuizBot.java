@@ -31,11 +31,19 @@ public class QuizBot {
     }
 
     public void handleInput(String text) {
+        // 1. Обработка команды старта
+        if (text.equalsIgnoreCase("/start")) {
+            start();
+            return;
+        }
+
+        // 2. Обработка рейтинга
         if (text.equalsIgnoreCase("рейтинг") || text.equalsIgnoreCase("/top")) {
             showLeaderboard();
             return;
         }
 
+        // 3. Обработка ответов на вопросы (игровой процесс)
         switch (state) {
             case ANSWERING:
                 handleAnswer(text);
@@ -75,15 +83,20 @@ public class QuizBot {
         Question q = questions.get(currentQuestionIndex);
         try {
             int choice = Integer.parseInt(text) - 1;
-            if (choice < 0 || choice >= q.getOptions().size()) {
-                ui.sendMessage("Пожалуйста, введите число от 1 до " + q.getOptions().size());
+            List<String> options = q.getOptions();
+
+            if (choice < 0 || choice >= options.size()) {
+                ui.sendMessage("Пожалуйста, введите число от 1 до " + options.size());
                 return;
             }
 
             attempts++; // Увеличиваем счетчик попыток
 
-            if (q.isCorrect(choice)) {
-                // Начисляем очки в зависимости от попытки
+            // Получаем текст варианта, который выбрал пользователь
+            String selectedOptionText = options.get(choice);
+
+            // Проверяем, совпадает ли он с правильным ответом
+            if (q.isCorrect(selectedOptionText)) {
                 if (attempts == 1) {
                     sessionScore += 10;
                     ui.sendMessage("Верно! +10 баллов 🎉");
@@ -94,31 +107,28 @@ public class QuizBot {
                     ui.sendMessage("Верно, но с 3-й попытки. +0 баллов 😅");
                 }
 
-                currentQuestionIndex++;
-                if (currentQuestionIndex < questions.size()) {
-                    sendCurrentQuestion();
-                } else {
-                    finishGame();
-                }
+                nextQuestion();
             } else {
                 if (attempts >= 3) {
-                    // Если 3 ошибки — показываем правильный ответ и идем дальше
-                    ui.sendMessage("Увы, 3 попытки исчерпаны. Правильный ответ: "
-                            + (q.getCorrectOptionIndex() + 1) + ") "
-                            + q.getOptions().get(q.getCorrectOptionIndex()));
-
-                    currentQuestionIndex++;
-                    if (currentQuestionIndex < questions.size()) {
-                        sendCurrentQuestion();
-                    } else {
-                        finishGame();
-                    }
+                    // При 3-х ошибках выводим правильный текст ответа
+                    ui.sendMessage("Увы, 3 попытки исчерпаны. Правильный ответ: " + q.getCorrectAnswer());
+                    nextQuestion();
                 } else {
                     ui.sendMessage("Неверно. Попробуйте еще раз. (Попытка " + (attempts + 1) + " из 3)");
                 }
             }
         } catch (NumberFormatException e) {
             ui.sendMessage("Ошибка: введите число.");
+        }
+    }
+
+    // Вынес переход к следующему вопросу в отдельный метод, чтобы не дублировать код
+    private void nextQuestion() {
+        currentQuestionIndex++;
+        if (currentQuestionIndex < questions.size()) {
+            sendCurrentQuestion();
+        } else {
+            finishGame();
         }
     }
 
