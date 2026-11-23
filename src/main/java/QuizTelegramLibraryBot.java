@@ -5,6 +5,9 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.meta.TelegramBotsApi;
+import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
+
 import java.util.List;
 
 public class QuizTelegramLibraryBot extends TelegramLongPollingBot {
@@ -60,6 +63,18 @@ public class QuizTelegramLibraryBot extends TelegramLongPollingBot {
             } catch (TelegramApiException e) {
                 System.err.println("Не удалось отправить сообщение " + chatId);
             }
+        }
+    }
+    public static QuizTelegramLibraryBot startBot(QuestionProvider provider, ScoreManager scoreManager) {
+        try {
+            TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
+            QuizTelegramLibraryBot bot = new QuizTelegramLibraryBot(provider, scoreManager);
+            botsApi.registerBot(bot);
+            System.out.println("Telegram-бот успешно запущен!");
+            return bot;
+        } catch (TelegramApiException e) {
+            System.err.println("Ошибка запуска бота: " + e.getMessage());
+            return null;
         }
     }
 }

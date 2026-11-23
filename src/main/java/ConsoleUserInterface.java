@@ -26,7 +26,29 @@ public class ConsoleUserInterface implements UserInterface {
                 System.out.println("Выход из игры. До встречи!");
                 break;
             }
-            bot.handleInput(input);
+
+            // Если бот ждет выбора сложности (выводятся кнопки)
+            if (bot.getState() == QuizBot.State.WAITING_FOR_DIFFICULTY) {
+                if (input.equals("1")) {
+                    bot.handleCallback("DIFF:EASY"); // Имитируем нажатие кнопки "Легкий"
+                } else if (input.equals("2")) {
+                    bot.handleCallback("DIFF:MEDIUM"); // "Средний"
+                } else if (input.equals("3")) {
+                    bot.handleCallback("DIFF:HARD"); // "Сложный"
+                } else {
+                    System.out.println("Пожалуйста, выберите 1, 2 или 3.");
+                }
+            }
+            // Если бот ждет ответа на вопрос
+            else if (bot.getState() == QuizBot.State.ANSWERING) {
+                // Здесь можно оставить handleInput (если ты поддерживаешь ввод цифрами)
+                // Или тоже переделать на Callback: bot.handleCallback("ANS:" + currentQuestionIndex + ":" + (choice-1))
+                bot.handleInput(input);
+            }
+            // В остальных случаях (ввод имени, рейтинг, /start)
+            else {
+                bot.handleInput(input);
+            }
         }
     }
 }

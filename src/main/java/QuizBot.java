@@ -23,8 +23,9 @@ public class QuizBot {
         this.ui = ui;
     }
 
-    public State getState() { return state; }
-
+    public State getState() {
+        return state;
+    }
     public void start() {
         if (ui.getUsername().startsWith("Игрок_") || ui.getUsername() == null) {
             state = State.WAITING_FOR_NAME;

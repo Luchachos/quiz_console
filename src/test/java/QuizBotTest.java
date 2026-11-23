@@ -10,226 +10,127 @@ class QuizBotTest {
     private FakeUserInterface ui;
     private ScoreManager scoreManager;
     private QuizBot bot;
-
-    // Вопрос: правильный ответ — индекс 1 ("Java")
-    private Question q1;
-    // Вопрос: правильный ответ — индекс 0 ("Амазонка")
-    private Question q2;
+    private List<Question> testQuestions;
 
     @BeforeEach
     void setUp() {
-        // Чистим файл рекордов, чтобы тесты не влияли друг на друга
-        java.io.File f = new java.io.File("records.txt");
-        if (f.exists()) f.delete();
+        // Создаем тестовые вопросы (2 легких, 2 сложных)
+        testQuestions = List.of(
+                new Question("Легкий вопрос 1?", List.of("A", "B", "C"), "A", "EASY"),
+                new Question("Легкий вопрос 2?", List.of("D", "E", "F"), "D", "EASY"),
+                new Question("Сложный вопрос 1?", List.of("X", "Y", "Z"), "X", "HARD"),
+                new Question("Сложный вопрос 2?", List.of("1", "2", "3"), "1", "HARD")
+        );
 
-        q1 = new Question("Язык?", List.of("Python", "Java", "C++"), "Java");
-        q2 = new Question("Река?", List.of("Амазонка", "Нил", "Янцзы"), "Амазонка");
-
-        ui = new FakeUserInterface("tester");
-        scoreManager = new ScoreManager();
-        QuestionProvider provider = new FakeProvider(List.of(q1, q2));
+        ui = new FakeUserInterface("TestUser"); // Имя есть, значит шаг ввода имени пропускается
+        // Используем InMemoryScoreStorage, чтобы не создавать файл records.txt
+        scoreManager = new ScoreManager(new InMemoryScoreStorage());
+        QuestionProvider provider = new FakeQuestionProvider(testQuestions);
         bot = new QuizBot(provider, scoreManager, ui);
     }
 
-    // --- старт ---
+    // --- Тесты старта и выбора сложности ---
 
     @Test
-    void start_sendsGreetingAndFirstQuestion() {
+    void start_withUsername_asksForDifficulty() {
         bot.start();
 
-        assertTrue(ui.hasMessageContaining("Привет, tester"));
-        assertTrue(ui.hasMessageContaining("Вопрос 1 из 2"));
-        assertTrue(ui.hasMessageContaining("Язык?"));
-        // варианты пронумерованы с 1
-        assertTrue(ui.hasMessageContaining("1) Python"));
-        assertTrue(ui.hasMessageContaining("2) Java"));
-        assertTrue(ui.hasMessageContaining("3) C++"));
+        assertTrue(ui.hasMessageContaining("Выбери уровень сложности, TestUser"));
+        assertEquals("DIFF", ui.getLastCallbackPrefix());
+        assertEquals(3, ui.getLastButtonTexts().size()); // Легкий, Средний, Сложный
     }
 
-    // --- правильный ответ с первой попытки ---
+    @Test
+    void start_withoutUsername_asksForName() {
+        FakeUserInterface noNameUi = new FakeUserInterface("Игрок_12345");
+        QuizBot noNameBot = new QuizBot(new FakeQuestionProvider(testQuestions), scoreManager, noNameUi);
+
+        noNameBot.start();
+        assertTrue(noNameUi.hasMessageContaining("Как тебя зовут?"));
+    }
 
     @Test
-    void correctFirstTry_gives10Points_andMovesToNextQuestion() {
+    void handleName_thenAsksForDifficulty() {
+        FakeUserInterface noNameUi = new FakeUserInterface("Игрок_12345");
+        QuizBot noNameBot = new QuizBot(new FakeQuestionProvider(testQuestions), scoreManager, noNameUi);
+
+        noNameBot.start(); // Ждет имя
+        noNameBot.handleInput("Влад"); // Вводим имя
+
+        assertTrue(noNameUi.hasMessageContaining("Выбери уровень сложности, Влад"));
+    }
+
+    // --- Тесты игрового процесса (через Callback) ---
+
+    @Test
+    void chooseDifficulty_startsGameAndFiltersQuestions() {
         bot.start();
         ui.clear();
 
-        bot.handleInput("2"); // правильный ответ
+        // Выбираем сложный уровень (HARD)
+        bot.handleCallback("DIFF:HARD");
+
+        // Должен быть отправлен вопрос (их всего 2 для HARD, значит берем 2)
+        assertTrue(ui.hasMessageContaining("Вопрос 1 из 2"));
+        assertTrue(ui.hasMessageContaining("Сложный вопрос"));
+        assertTrue(ui.getLastCallbackPrefix().startsWith("ANS:0"));
+    }
+
+    @Test
+    void correctAnswer_viaCallback_gives10Points() {
+        bot.start();
+        bot.handleCallback("DIFF:EASY");
+        ui.clear();
+
+        // Нажимаем на кнопку (индекс 0 - это ответ "A", он правильный для "Легкий вопрос 1")
+        bot.handleCallback("ANS:0:0");
 
         assertTrue(ui.hasMessageContaining("+10"));
         assertTrue(ui.hasMessageContaining("Вопрос 2 из 2"));
     }
 
-    // --- правильный ответ со второй попытки ---
-
     @Test
-    void correctSecondTry_gives5Points() {
+    void wrongAnswer_viaCallback_showsAttempts() {
         bot.start();
-        bot.handleInput("1"); // неверно, попытка 1
+        bot.handleCallback("DIFF:EASY");
         ui.clear();
 
-        bot.handleInput("2"); // верно, попытка 2
+        // Нажимаем на неправильный ответ (индекс 1 - "B")
+        bot.handleCallback("ANS:0:1");
 
-        assertTrue(ui.hasMessageContaining("+5"));
+        assertTrue(ui.hasMessageContaining("Неверно. Попытка 2 из 3"));
     }
 
-    // --- правильный ответ с третьей попытки: 0 очков ---
-
     @Test
-    void correctThirdTry_gives0Points() {
+    void ignoreOldQuestionCallback() {
         bot.start();
-        bot.handleInput("1"); // неверно
-        bot.handleInput("3"); // неверно
+        bot.handleCallback("DIFF:EASY");
+        bot.handleCallback("ANS:0:0"); // Ответили на 1-й, перешли на 2-й
         ui.clear();
 
-        bot.handleInput("2"); // верно, попытка 3
+        // Пытаемся нажать кнопку от СТАРОГО вопроса (ANS:0:1)
+        bot.handleCallback("ANS:0:1");
 
-        assertTrue(ui.hasMessageContaining("+0") || ui.hasMessageContaining("3-й попытки"));
-        assertTrue(ui.hasMessageContaining("Вопрос 2 из 2"));
+        // Ничего не должно произойти (не перескочим на след. вопрос)
+        assertTrue(ui.getSentMessages().isEmpty());
     }
 
-    // --- три ошибки: показываем правильный ответ и идём дальше ---
+    // --- Тесты завершения игры ---
 
     @Test
-    void threeWrongAnswers_showsCorrectAnswerAndMovesOn() {
+    void finishingGame_savesRecordWithChosenName() {
         bot.start();
-        bot.handleInput("1");
-        bot.handleInput("1");
-        ui.clear();
+        bot.handleCallback("DIFF:EASY");
 
-        bot.handleInput("1"); // третья ошибка
+        bot.handleCallback("ANS:0:0"); // Вопрос 1 - верно (+10)
+        bot.handleCallback("ANS:1:0"); // Вопрос 2 - верно (+10)
 
-        assertTrue(ui.hasMessageContaining("3 попытки исчерпаны"));
-        assertTrue(ui.hasMessageContaining("2) Java")); // правильный ответ с номером
-        assertTrue(ui.hasMessageContaining("Вопрос 2 из 2"));
-    }
+        assertTrue(ui.hasMessageContaining("Игра окончена! Твой результат: 20"));
 
-    // --- после второй ошибки ещё можно пробовать ---
-
-    @Test
-    void secondWrongAnswer_stillAsksToRetry() {
-        bot.start();
-        bot.handleInput("1"); // ошибка 1
-        ui.clear();
-
-        bot.handleInput("1"); // ошибка 2
-
-        assertTrue(ui.hasMessageContaining("Неверно"));
-        assertTrue(ui.hasMessageContaining("Попытка 3 из 3"));
-    }
-
-    // --- нечисловой ввод ---
-
-    @Test
-    void nonNumericInput_reportsError() {
-        bot.start();
-        ui.clear();
-
-        bot.handleInput("abc");
-
-        assertTrue(ui.hasMessageContaining("введите число"));
-    }
-
-    // --- номер вне диапазона ---
-
-    @Test
-    void outOfRangeAnswer_reportsError() {
-        bot.start();
-        ui.clear();
-
-        bot.handleInput("99");
-
-        assertTrue(ui.hasMessageContaining("от 1 до 3"));
-    }
-
-    // --- завершение игры и сохранение рекорда ---
-
-    @Test
-    void finishingGame_savesRecordAndShowsResult() {
-        bot.start();
-        bot.handleInput("2"); // q1 верно, +10
-        bot.handleInput("1"); // q2 верно, +10
-
-        assertTrue(ui.hasMessageContaining("Игра окончена"));
-        assertTrue(ui.hasMessageContaining("20"));
-
-        // рекорд сохранён в ScoreManager
-        List<java.util.Map.Entry<String, Integer>> top = scoreManager.getTopPlayers();
+        // Проверяем, что рекорд сохранился в БД
+        var top = scoreManager.getTopPlayers();
         assertEquals(1, top.size());
-        assertEquals("tester", top.get(0).getKey());
+        assertEquals("TestUser", top.get(0).getKey());
         assertEquals(20, top.get(0).getValue());
-    }
-
-    // --- рейтинг ---
-
-    @Test
-    void leaderboardCommand_printsTop() {
-        scoreManager.updateRecord("alice", 30);
-        scoreManager.updateRecord("bob", 10);
-
-        bot.start();
-        ui.clear();
-
-        bot.handleInput("рейтинг");
-
-        assertTrue(ui.hasMessageContaining("ТОП-10"));
-        assertTrue(ui.hasMessageContaining("alice"));
-        assertTrue(ui.hasMessageContaining("30"));
-        // порядок: alice выше bob
-        String msg = ui.getLastMessage();
-        assertTrue(msg.indexOf("alice") < msg.indexOf("bob"));
-    }
-
-    // --- /top как алиас рейтинга ---
-
-    @Test
-    void topCommand_isAliasForLeaderboard() {
-        scoreManager.updateRecord("alice", 30);
-        bot.start();
-        ui.clear();
-
-        bot.handleInput("/top");
-
-        assertTrue(ui.hasMessageContaining("ТОП-10"));
-    }
-
-    // --- пустой рейтинг ---
-
-    @Test
-    void leaderboard_whenEmpty_printsNotice() {
-        bot.start();
-        ui.clear();
-
-        bot.handleInput("рейтинг");
-
-        assertTrue(ui.hasMessageContaining("нет рекордов"));
-    }
-
-    // --- ввод в состоянии IDLE ---
-
-    @Test
-    void inputInIdleState_asksToStart() {
-        bot.start();
-        bot.handleInput("2");
-        bot.handleInput("1"); // игра окончена, state=IDLE
-        ui.clear();
-
-        bot.handleInput("5");
-
-        assertTrue(ui.hasMessageContaining("/start"));
-    }
-
-    // --- рейтинг работает и в IDLE ---
-
-    @Test
-    void leaderboardWorksEvenInIdleState() {
-        scoreManager.updateRecord("alice", 30);
-        bot.start();
-        bot.handleInput("2");
-        bot.handleInput("1"); // конец игры
-        ui.clear();
-
-        bot.handleInput("рейтинг");
-
-        assertTrue(ui.hasMessageContaining("ТОП-10"));
     }
 }

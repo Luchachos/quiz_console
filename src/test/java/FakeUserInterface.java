@@ -4,7 +4,8 @@ import java.util.List;
 public class FakeUserInterface implements UserInterface {
     private final String username;
     private final List<String> sentMessages = new ArrayList<>();
-    private String nextQuestionAnswer = "";
+    private String lastCallbackPrefix;
+    private List<String> lastButtonTexts;
 
     public FakeUserInterface(String username) {
         this.username = username;
@@ -16,31 +17,37 @@ public class FakeUserInterface implements UserInterface {
     }
 
     @Override
+    public void sendMessageWithButtons(String message, List<String> buttonTexts, String callbackPrefix) {
+        sentMessages.add(message);
+        this.lastButtonTexts = buttonTexts;
+        this.lastCallbackPrefix = callbackPrefix;
+    }
+
+    @Override
     public String getUsername() {
         return username;
     }
 
-    // --- хелперы для тестов ---
+    // --- Хелперы для тестов ---
 
     public List<String> getSentMessages() {
         return sentMessages;
     }
 
-    /** Последнее отправленное сообщение (или null, если ничего не отправлялось) */
     public String getLastMessage() {
         return sentMessages.isEmpty() ? null : sentMessages.get(sentMessages.size() - 1);
     }
 
-    /** Проверить, есть ли среди отправленных сообщений такое, что содержит подстроку */
     public boolean hasMessageContaining(String substring) {
         return sentMessages.stream().anyMatch(m -> m.contains(substring));
     }
 
     public void clear() {
         sentMessages.clear();
+        lastButtonTexts = null;
+        lastCallbackPrefix = null;
     }
 
-    public void setNextQuestionAnswer(String answer) {
-        this.nextQuestionAnswer = answer;
-    }
+    public String getLastCallbackPrefix() { return lastCallbackPrefix; }
+    public List<String> getLastButtonTexts() { return lastButtonTexts; }
 }
