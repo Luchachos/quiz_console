@@ -1,24 +1,23 @@
 import java.util.List;
 
 public class Question {
-    private final String text;
-    private final List<String> options;
-    private final String correctAnswer; // Теперь храним сам текст, а не индекс
+    private String text;
+    private List<String> options;
+    private String correctAnswer;
+    private String difficulty; // "EASY", "MEDIUM", "HARD"
 
-    public Question(String text, List<String> options, String correctAnswer) {
+    public Question(String text, List<String> options, String correctAnswer, String difficulty) {
         this.text = text;
         this.options = options;
         this.correctAnswer = correctAnswer;
+        this.difficulty = difficulty;
     }
 
     public String getText() { return text; }
     public List<String> getOptions() { return options; }
+    public String getCorrectAnswer() { return correctAnswer; }
+    public String getDifficulty() { return difficulty; }
 
-    public String getCorrectAnswer() {
-        return correctAnswer;
-    }
-
-    // Теперь проверяем по тексту варианта, а не по индексу!
     public boolean isCorrect(String userAnswer) {
         return correctAnswer.equalsIgnoreCase(userAnswer);
     }

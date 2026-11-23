@@ -1,3 +1,4 @@
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -6,18 +7,15 @@ public class QuizBot {
     private final ScoreManager scoreManager;
     private final UserInterface ui;
 
-    private enum State {
-        ANSWERING,   // Отвечаем на вопросы
-        IDLE         // Игра окончена
-    }
-
+    public enum State { WAITING_FOR_NAME, WAITING_FOR_DIFFICULTY, ANSWERING, IDLE }
     private State state = State.IDLE;
 
     private List<Question> questions;
     private int currentQuestionIndex;
-
-    private int sessionScore = 0; // Очки за текущую игру
-    private int attempts = 0;     // Попытки на текущий вопрос
+    private int sessionScore = 0;
+    private int attempts = 0;
+    private String playerName;
+    private String difficulty;
 
     public QuizBot(QuestionProvider provider, ScoreManager scoreManager, UserInterface ui) {
         this.questionProvider = provider;
@@ -25,122 +23,131 @@ public class QuizBot {
         this.ui = ui;
     }
 
+    public State getState() { return state; }
+
     public void start() {
-        ui.sendMessage("Привет, " + ui.getUsername() + "! Давай сыграем в викторину.");
-        startGame();
+        if (ui.getUsername().startsWith("Игрок_") || ui.getUsername() == null) {
+            state = State.WAITING_FOR_NAME;
+            ui.sendMessage("Привет! Давай знакомиться. Как тебя зовут?");
+        } else {
+            playerName = ui.getUsername();
+            askDifficulty();
+        }
+    }
+
+    private void askDifficulty() {
+        state = State.WAITING_FOR_DIFFICULTY;
+        ui.sendMessageWithButtons("Выбери уровень сложности, " + playerName + ":", List.of("Легкий", "Средний", "Сложный"), "DIFF");
     }
 
     public void handleInput(String text) {
-        // 1. Обработка команды старта
         if (text.equalsIgnoreCase("/start")) {
             start();
             return;
         }
-
-        // 2. Обработка рейтинга
         if (text.equalsIgnoreCase("рейтинг") || text.equalsIgnoreCase("/top")) {
             showLeaderboard();
             return;
         }
 
-        // 3. Обработка ответов на вопросы (игровой процесс)
         switch (state) {
+            case WAITING_FOR_NAME:
+                playerName = text.trim();
+                if (playerName.isEmpty() || playerName.length() > 15) {
+                    ui.sendMessage("Имя должно быть от 1 до 15 символов. Попробуй еще раз:");
+                    return;
+                }
+                askDifficulty();
+                break;
             case ANSWERING:
-                handleAnswer(text);
+                handleTextAnswer(text);
                 break;
-            case IDLE:
             default:
-                ui.sendMessage("Напишите /start, чтобы начать викторину.");
-                break;
+                ui.sendMessage("Напишите /start для начала игры.");
+        }
+    }
+
+    public void handleCallback(String data) {
+        if (data.startsWith("DIFF:")) {
+            difficulty = data.split(":")[1];
+            ui.sendMessage("Отлично! Сложность: " + difficulty + ". Поехали!");
+            startGame();
+        } else if (data.startsWith("ANS:") && state == State.ANSWERING) {
+            String[] parts = data.split(":");
+            int qId = Integer.parseInt(parts[1]);
+            int answerIndex = Integer.parseInt(parts[2]);
+            if (qId == currentQuestionIndex) processAnswer(answerIndex);
+        } else if (data.equals("REMIND:START")) {
+            start();
         }
     }
 
     private void startGame() {
-        questions = questionProvider.getQuestions();
+        List<Question> all = questionProvider.getQuestionsByDifficulty(difficulty);
+        if (all.isEmpty()) {
+            ui.sendMessage("Вопросов такой сложности пока нет.");
+            state = State.IDLE;
+            return;
+        }
+        Collections.shuffle(all);
+        questions = all.subList(0, Math.min(all.size(), 10));
         currentQuestionIndex = 0;
         sessionScore = 0;
-        attempts = 0;
         state = State.ANSWERING;
-
         sendCurrentQuestion();
     }
 
     private void sendCurrentQuestion() {
-        attempts = 0; // Сбрасываем попытки для нового вопроса
+        attempts = 0;
         Question q = questions.get(currentQuestionIndex);
-
-        StringBuilder sb = new StringBuilder("\nВопрос " + (currentQuestionIndex + 1) + " из " + questions.size() + "\n");
-        sb.append(q.getText()).append('\n');
-        List<String> options = q.getOptions();
-        for (int i = 0; i < options.size(); i++) {
-            sb.append(i + 1).append(") ").append(options.get(i)).append('\n');
-        }
-        sb.append("Ваш ответ:");
-        ui.sendMessage(sb.toString());
+        String msg = "\nВопрос " + (currentQuestionIndex + 1) + "/" + questions.size() + "\n" + q.getText();
+        ui.sendMessageWithButtons(msg, q.getOptions(), "ANS:" + currentQuestionIndex);
     }
 
-    private void handleAnswer(String text) {
-        Question q = questions.get(currentQuestionIndex);
+    private void handleTextAnswer(String text) {
         try {
             int choice = Integer.parseInt(text) - 1;
-            List<String> options = q.getOptions();
-
-            if (choice < 0 || choice >= options.size()) {
-                ui.sendMessage("Пожалуйста, введите число от 1 до " + options.size());
+            if (choice < 0 || choice >= questions.get(currentQuestionIndex).getOptions().size()) {
+                ui.sendMessage("Введите число от 1 до " + questions.get(currentQuestionIndex).getOptions().size());
                 return;
             }
-
-            attempts++; // Увеличиваем счетчик попыток
-
-            // Получаем текст варианта, который выбрал пользователь
-            String selectedOptionText = options.get(choice);
-
-            // Проверяем, совпадает ли он с правильным ответом
-            if (q.isCorrect(selectedOptionText)) {
-                if (attempts == 1) {
-                    sessionScore += 10;
-                    ui.sendMessage("Верно! +10 баллов 🎉");
-                } else if (attempts == 2) {
-                    sessionScore += 5;
-                    ui.sendMessage("Верно! +5 баллов 👍");
-                } else {
-                    ui.sendMessage("Верно, но с 3-й попытки. +0 баллов 😅");
-                }
-
-                nextQuestion();
-            } else {
-                if (attempts >= 3) {
-                    // При 3-х ошибках выводим правильный текст ответа
-                    ui.sendMessage("Увы, 3 попытки исчерпаны. Правильный ответ: " + q.getCorrectAnswer());
-                    nextQuestion();
-                } else {
-                    ui.sendMessage("Неверно. Попробуйте еще раз. (Попытка " + (attempts + 1) + " из 3)");
-                }
-            }
+            processAnswer(choice);
         } catch (NumberFormatException e) {
             ui.sendMessage("Ошибка: введите число.");
         }
     }
 
-    // Вынес переход к следующему вопросу в отдельный метод, чтобы не дублировать код
+    private void processAnswer(int choice) {
+        Question q = questions.get(currentQuestionIndex);
+        attempts++;
+        if (q.isCorrect(q.getOptions().get(choice))) {
+            if (attempts == 1) { sessionScore += 10; ui.sendMessage("Верно! +10 🎉"); }
+            else if (attempts == 2) { sessionScore += 5; ui.sendMessage("Верно! +5 👍"); }
+            else { ui.sendMessage("Верно с 3-й попытки. 0 😅"); }
+            nextQuestion();
+        } else {
+            if (attempts >= 3) {
+                ui.sendMessage("Увы, попытки кончились. Правильный ответ: " + q.getCorrectAnswer());
+                nextQuestion();
+            } else {
+                ui.sendMessage("Неверно. Попытка " + (attempts + 1) + " из 3.");
+            }
+        }
+    }
+
     private void nextQuestion() {
         currentQuestionIndex++;
-        if (currentQuestionIndex < questions.size()) {
-            sendCurrentQuestion();
-        } else {
-            finishGame();
-        }
+        if (currentQuestionIndex < questions.size()) sendCurrentQuestion();
+        else finishGame();
     }
 
     private void finishGame() {
         state = State.IDLE;
         ui.sendMessage("\nИгра окончена! Ваш результат: " + sessionScore + " баллов.");
+        scoreManager.updateRecord(playerName, sessionScore);
 
-        // Обновляем рекорд
-        scoreManager.updateRecord(ui.getUsername(), sessionScore);
-        ui.sendMessage("Ваш рекорд сохранен! Напишите 'рейтинг', чтобы посмотреть таблицу лидеров или /start для новой игры.");
+        ui.sendMessage("Ваш рекорд сохранен! Напишите 'рейтинг', чтобы посмотреть таблицу лидеров, или /start для новой игры.");
     }
-
     private void showLeaderboard() {
         List<Map.Entry<String, Integer>> top = scoreManager.getTopPlayers();
         if (top.isEmpty()) {

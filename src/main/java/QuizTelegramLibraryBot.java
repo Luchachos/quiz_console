@@ -1,40 +1,65 @@
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import java.util.List;
 
 public class QuizTelegramLibraryBot extends TelegramLongPollingBot {
-
     private final SessionManager sessionManager;
 
     public QuizTelegramLibraryBot(QuestionProvider provider, ScoreManager scoreManager) {
         this.sessionManager = new SessionManager(provider, scoreManager);
     }
 
-    @Override
-    public String getBotUsername() {
-        return "@MatMechQuizBot"; // Например, "my_quiz_bot"
-    }
+    @Override public String getBotUsername() { return "@MatMechQuizBot"; }
 
     @Override
     public String getBotToken() {
-        String token = System.getenv("BOT_TOKEN");
-        return token;// Берем из переменной окружения
+        return System.getenv("BOT_TOKEN");
     }
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (!update.hasMessage() || !update.getMessage().hasText()) return;
+        long chatId; String text; String username;
 
-        long chatId = update.getMessage().getChatId();
-        String text = update.getMessage().getText();
-        String username = update.getMessage().getFrom().getUserName();
-        if (username == null) username = update.getMessage().getFrom().getFirstName();
+        if (update.hasCallbackQuery()) {
+            chatId = update.getCallbackQuery().getMessage().getChatId();
+            text = update.getCallbackQuery().getData();
+            username = update.getCallbackQuery().getFrom().getUserName();
+            if (username == null) username = update.getCallbackQuery().getFrom().getFirstName();
+            try { execute(new AnswerCallbackQuery(update.getCallbackQuery().getId())); } catch (Exception ignored) {}
+        } else if (update.hasMessage() && update.getMessage().hasText()) {
+            chatId = update.getMessage().getChatId();
+            text = update.getMessage().getText();
+            username = update.getMessage().getFrom().getUserName();
+            if (username == null) username = update.getMessage().getFrom().getFirstName();
+        } else return;
 
-        // Создаем интерфейс для этого сообщения
         TelegramLibraryUserInterface ui = new TelegramLibraryUserInterface(chatId, this, username);
-
-        // Получаем или создаем сессию
         QuizBot bot = sessionManager.getOrCreate(chatId, ui);
 
-        bot.handleInput(text);
+        if (update.hasCallbackQuery()) bot.handleCallback(text);
+        else bot.handleInput(text);
+    }
+
+    // МЕТОД ДЛЯ РАССЫЛКИ НАПОМИНАНИЙ
+    public void sendReminderToAll() {
+        System.out.println("Запуск рассылки напоминаний...");
+        for (Long chatId : sessionManager.getSessions().keySet()) {
+            SendMessage msg = new SendMessage(String.valueOf(chatId), "Привет! Ты давно не заходил. Не хочешь сыграть в викторину?");
+            InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+            InlineKeyboardButton btn = new InlineKeyboardButton("Сыграть!");
+            btn.setCallbackData("REMIND:START");
+            markup.setKeyboard(List.of(List.of(btn)));
+            msg.setReplyMarkup(markup);
+            try {
+                execute(msg);
+            } catch (TelegramApiException e) {
+                System.err.println("Не удалось отправить сообщение " + chatId);
+            }
+        }
     }
 }
