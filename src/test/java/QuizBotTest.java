@@ -25,7 +25,7 @@ class QuizBotTest {
         ui = new FakeUserInterface("TestUser"); // Имя есть, значит шаг ввода имени пропускается
         // Используем InMemoryScoreStorage, чтобы не создавать файл records.txt
         scoreManager = new ScoreManager(new InMemoryScoreStorage());
-        QuestionProvider provider = new FakeQuestionProvider(testQuestions);
+        QuestionProvider provider = new FakeProvider(testQuestions);
         bot = new QuizBot(provider, scoreManager, ui);
     }
 
@@ -43,7 +43,7 @@ class QuizBotTest {
     @Test
     void start_withoutUsername_asksForName() {
         FakeUserInterface noNameUi = new FakeUserInterface("Игрок_12345");
-        QuizBot noNameBot = new QuizBot(new FakeQuestionProvider(testQuestions), scoreManager, noNameUi);
+        QuizBot noNameBot = new QuizBot(new FakeProvider(testQuestions), scoreManager, noNameUi);
 
         noNameBot.start();
         assertTrue(noNameUi.hasMessageContaining("Как тебя зовут?"));
@@ -52,7 +52,7 @@ class QuizBotTest {
     @Test
     void handleName_thenAsksForDifficulty() {
         FakeUserInterface noNameUi = new FakeUserInterface("Игрок_12345");
-        QuizBot noNameBot = new QuizBot(new FakeQuestionProvider(testQuestions), scoreManager, noNameUi);
+        QuizBot noNameBot = new QuizBot(new FakeProvider(testQuestions), scoreManager, noNameUi);
 
         noNameBot.start(); // Ждет имя
         noNameBot.handleInput("Влад"); // Вводим имя

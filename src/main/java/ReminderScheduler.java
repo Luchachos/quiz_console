@@ -12,11 +12,9 @@ public class ReminderScheduler {
     }
 
     public void startDailyReminders() {
-        // В продакшене: задержка 0, повтор каждые 24 часа
-        // (Для теста раскомментируй строку ниже с 1 минутой)
 
-        // scheduler.scheduleAtFixedRate(bot::sendReminderToAll, 1, 1, TimeUnit.MINUTES);
-        scheduler.scheduleAtFixedRate(bot::sendReminderToAll, 0, 24, TimeUnit.HOURS);
+        scheduler.scheduleAtFixedRate(bot::sendReminderToAll, 1, 1, TimeUnit.MINUTES);
+        //scheduler.scheduleAtFixedRate(bot::sendReminderToAll, 0, 24, TimeUnit.HOURS);
 
         System.out.println("Планировщик напоминаний запущен (раз в 24 часа).");
     }

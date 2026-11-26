@@ -17,7 +17,6 @@ public class Question {
     public List<String> getOptions() { return options; }
     public String getCorrectAnswer() { return correctAnswer; }
     public String getDifficulty() { return difficulty; }
-
     public boolean isCorrect(String userAnswer) {
         return correctAnswer.equalsIgnoreCase(userAnswer);
     }
