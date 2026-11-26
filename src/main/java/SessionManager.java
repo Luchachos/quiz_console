@@ -1,4 +1,3 @@
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,5 +14,7 @@ public class SessionManager {
     public QuizBot getOrCreate(long chatId, UserInterface ui) {
         return sessions.computeIfAbsent(chatId, id -> new QuizBot(provider, scoreManager, ui));
     }
-}
 
+    // Нужно для рассылки
+    public Map<Long, QuizBot> getSessions() { return sessions; }
+}

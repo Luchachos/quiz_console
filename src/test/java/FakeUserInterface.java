@@ -1,10 +1,11 @@
 import java.util.ArrayList;
 import java.util.List;
 
-// 1. Фейковый UI
 public class FakeUserInterface implements UserInterface {
-    public final List<String> messages = new ArrayList<>();
     private final String username;
+    private final List<String> sentMessages = new ArrayList<>();
+    private String lastCallbackPrefix;
+    private List<String> lastButtonTexts;
 
     public FakeUserInterface(String username) {
         this.username = username;
@@ -12,7 +13,14 @@ public class FakeUserInterface implements UserInterface {
 
     @Override
     public void sendMessage(String message) {
-        messages.add(message);
+        sentMessages.add(message);
+    }
+
+    @Override
+    public void sendMessageWithButtons(String message, List<String> buttonTexts, String callbackPrefix) {
+        sentMessages.add(message);
+        this.lastButtonTexts = buttonTexts;
+        this.lastCallbackPrefix = callbackPrefix;
     }
 
     @Override
@@ -20,9 +28,26 @@ public class FakeUserInterface implements UserInterface {
         return username;
     }
 
-    // Удобный метод: проверяем, содержит ли последнее сообщение нужный текст
-    public boolean lastMessageContains(String text) {
-        if (messages.isEmpty()) return false;
-        return messages.get(messages.size() - 1).contains(text);
+    // --- Хелперы для тестов ---
+
+    public List<String> getSentMessages() {
+        return sentMessages;
     }
+
+    public String getLastMessage() {
+        return sentMessages.isEmpty() ? null : sentMessages.get(sentMessages.size() - 1);
+    }
+
+    public boolean hasMessageContaining(String substring) {
+        return sentMessages.stream().anyMatch(m -> m.contains(substring));
+    }
+
+    public void clear() {
+        sentMessages.clear();
+        lastButtonTexts = null;
+        lastCallbackPrefix = null;
+    }
+
+    public String getLastCallbackPrefix() { return lastCallbackPrefix; }
+    public List<String> getLastButtonTexts() { return lastButtonTexts; }
 }

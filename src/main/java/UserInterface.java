@@ -1,5 +1,7 @@
+import java.util.List;
 
 public interface UserInterface {
     void sendMessage(String message);
-    String getUsername(); // Имя игрока для таблицы рекордов
+    void sendMessageWithButtons(String message, List<String> buttonTexts, String callbackPrefix); // НОВОЕ
+    String getUsername();
 }
